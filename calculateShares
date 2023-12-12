@@ -1,0 +1,68 @@
+package liquidity
+
+import (
+	"fmt"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+)
+
+// LiquidityPool represents a liquidity pool
+type LiquidityPool struct {
+	ID          uint64         `json:"id"`
+	ReserveA     sdk.Coin       `json:"reserve_a"`
+	ReserveB     sdk.Coin       `json:"reserve_b"`
+	Liquidity    sdk.Coin       `json:"liquidity"`
+	TotalShares  sdk.Dec        `json:"total_shares"`
+}
+
+// MsgAddLiquidity defines the AddLiquidity message
+type MsgAddLiquidity struct {
+	Sender    sdk.AccAddress `json:"sender"`
+	PoolID    uint64         `json:"pool_id"`
+	AssetA    sdk.Coin       `json:"asset_a"`
+	AssetB    sdk.Coin       `json:"asset_b"`
+	MinShares sdk.Dec        `json:"min_shares"`
+}
+
+// HandleMsgAddLiquidity handles the AddLiquidity message
+func HandleMsgAddLiquidity(ctx sdk.Context, k Keeper, msg MsgAddLiquidity) sdk.Result {
+	pool, found := k.GetLiquidityPool(ctx, msg.PoolID)
+	if !found {
+		return sdk.ErrUnknownRequest(fmt.Sprintf("liquidity pool with ID %d not found", msg.PoolID)).Result()
+	}
+
+	// Perform some additional checks or operations if needed...
+
+	// Calculate shares and update pool state...
+	shares := calculateShares(msg.AssetA, msg.AssetB, pool.ReserveA, pool.ReserveB, pool.TotalShares)
+
+	// Update pool state...
+	pool.ReserveA = pool.ReserveA.Add(msg.AssetA)
+	pool.ReserveB = pool.ReserveB.Add(msg.AssetB)
+	pool.TotalShares = pool.TotalShares.Add(shares)
+
+	// Mint shares to the liquidity provider...
+	mintSharesToProvider(msg.Sender, shares)
+
+	// Emit an event
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			sdk.EventTypeMessage,
+			sdk.NewAttribute(sdk.AttributeKeyModule, sdk.AttributeValueCategory),
+		),
+	)
+
+	return sdk.Result{Code: sdk.CodeOK, Events: ctx.EventManager().ABCIEvents()}
+}
+
+// calculateShares is a helper function to calculate shares based on assets and pool reserves
+func calculateShares(assetA, assetB, reserveA, reserveB sdk.Coin, totalShares sdk.Dec) sdk.Dec {
+	// Add your calculation logic here...
+	return sdk.NewDecFromInt(assetA.Amount).Quo(reserveA.Amount)
+}
+
+// mintSharesToProvider is a placeholder function to represent the minting of shares to the liquidity provider
+func mintSharesToProvider(provider sdk.AccAddress, shares sdk.Dec) {
+	// Add your minting logic here...
+	fmt.Printf("Minting %s shares to %s\n", shares, provider.String())
+}
